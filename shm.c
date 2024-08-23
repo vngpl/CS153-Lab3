@@ -30,35 +30,69 @@ void shminit() {
   release(&(shm_table.lock));
 }
 
-// for uint size in mappages() use pgsize variable for default page size
+void map_shm_page(struct proc *p, struct shm_page *page, char **pointer) {
+  void *va = (void*)PGROUNDUP(p->sz);
+  uint pa = V2P(page->frame);
+  mappages(p->pgdir, va, PGSIZE, pa, PTE_W|PTE_U);
+  *pointer = (char*)va;
+  p->sz += PGSIZE;
+}
 
 int shm_open(int id, char **pointer) {
   int i;
-  struct proc *p = myproc();
+  struct proc *curproc = myproc();
+  struct shm_page *pg = 0;
 
   acquire(&(shm_table.lock));
+
   // case 1: shm with id exists
   for (i = 0; i < SHM_TABLE_SIZE; i++) {
-    if (shm_table.shm_pages[i].id == (uint)id) {
-      shm_table.shm_pages[i].refcnt++;
-      mappages(p->pgdir, (void*)PGROUNDUP(p->sz), PGSIZE, V2P(shm_table.shm_pages[i].frame), PTE_W|PTE_U);
-      *pointer = (char*)PGROUNDUP(p->sz);
-      p->sz += PGSIZE;
+    pg = &shm_table.shm_pages[i];
+    if (pg->id == (uint)id) {
+      pg->refcnt++;
+      map_shm_page(curproc, pg, pointer);
       release(&(shm_table.lock));
       return 0;
     }
   }
 
+  // case 2: shm with id does not exist
+  // for (i = 0; i < SHM_TABLE_SIZE; i++) {
+  //   pg = &shm_table.shm_pages[i];
+  //   if (pg->id == 0) {
+  //     pg->id = (uint)id;
+  //     pg->frame = kalloc();
+  //     pg->refcnt = 1;
+  //     map_shm_page(curproc, pg, pointer);
+  //     release(&(shm_table.lock));
+  //     return 0;
+  //   }
+  // }
 
-  return 0; //added to remove compiler warning -- you should decide what to return
+  release(&(shm_table.lock));
+  return -1; // reaches if shm_table is full
 }
 
 
 int shm_close(int id) {
-//you write this too!
+  int i;
+  struct shm_page *pg = 0;
 
+  acquire(&(shm_table.lock));
 
+  for (i = 0; i < SHM_TABLE_SIZE; i++) {
+    pg = &shm_table.shm_pages[i];
+    if (pg->id == (uint)id) {
+      pg->refcnt--;
+      if (pg->refcnt > 0)
+        break;
+      pg->frame = 0;
+      pg->id = 0;
+      // unmap pages on PTE
+      // use walkpgdir() to free memory
+    }
+  }
 
-
-  return 0; //added to remove compiler warning -- you should decide what to return
+  release(&(shm_table.lock));
+  return 1; //added to remove compiler warning -- you should decide what to return
 }
