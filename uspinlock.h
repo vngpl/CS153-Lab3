@@ -1,9 +1,6 @@
-
-
 struct uspinlock {
-uint locked;
+  uint locked;
 };
 
 void uacquire(struct uspinlock *lock);
 void urelease(struct uspinlock *lock);
-

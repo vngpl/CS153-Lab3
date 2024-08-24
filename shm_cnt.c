@@ -4,8 +4,9 @@
 #include "uspinlock.h"
 
 struct shm_cnt {
-   struct uspinlock lock;
-   int cnt;
+  struct uspinlock lock;
+  struct uspinlock printlock;
+  int cnt;
 };
 
 int
@@ -30,16 +31,23 @@ main(int argc, char *argv[])
     urelease(&(counter->lock));
 
   //print something because we are curious and to give a chance to switch process
-    if(i%1000 == 0)
+    if(i%1000 == 0) {
+      uacquire(&(counter->printlock));
       printf(1,"Counter in %s is %d at address %x\n",pid? "Parent" : "Child", counter->cnt, counter);
+      urelease(&(counter->printlock));
+    }
   }
 
   if (pid) {
+    uacquire(&(counter->printlock));
     printf(1,"Counter in parent is %d\n",counter->cnt);
+    urelease(&(counter->printlock));
     wait();
   }
   else {
+    uacquire(&(counter->printlock));
     printf(1,"Counter in child is %d\n\n",counter->cnt);
+    urelease(&(counter->printlock));
   }
 
   //shm_close: first process will just detach, next one will free up the shm_table entry (but for now not the page)

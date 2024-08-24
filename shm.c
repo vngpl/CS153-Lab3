@@ -57,17 +57,18 @@ int shm_open(int id, char **pointer) {
   }
 
   // case 2: shm with id does not exist
-  // for (i = 0; i < SHM_TABLE_SIZE; i++) {
-  //   pg = &shm_table.shm_pages[i];
-  //   if (pg->id == 0) {
-  //     pg->id = (uint)id;
-  //     pg->frame = kalloc();
-  //     pg->refcnt = 1;
-  //     map_shm_page(curproc, pg, pointer);
-  //     release(&(shm_table.lock));
-  //     return 0;
-  //   }
-  // }
+  for (i = 0; i < SHM_TABLE_SIZE; i++) {
+    pg = &shm_table.shm_pages[i];
+    if (!pg->id) {
+      pg->id = (uint)id;
+      pg->frame = kalloc();
+      memset(pg->frame, 0, PGSIZE);
+      pg->refcnt = 1;
+      map_shm_page(curproc, pg, pointer);
+      release(&(shm_table.lock));
+      return 0;
+    }
+  }
 
   release(&(shm_table.lock));
   return -1; // reaches if shm_table is full
