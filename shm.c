@@ -15,7 +15,7 @@ struct {
     uint id;
     char *frame;
     int refcnt;
-  } shm_pages[64];
+  } shm_pages[SHM_TABLE_SIZE];
 } shm_table;
 
 void shminit() {
@@ -74,7 +74,6 @@ int shm_open(int id, char **pointer) {
   return -1; // reaches if shm_table is full
 }
 
-
 int shm_close(int id) {
   int i;
   struct shm_page *pg = 0;
@@ -85,15 +84,19 @@ int shm_close(int id) {
     pg = &shm_table.shm_pages[i];
     if (pg->id == (uint)id) {
       pg->refcnt--;
-      if (pg->refcnt > 0)
-        break;
+      if (pg->refcnt > 0) {
+        release(&(shm_table.lock));
+        return 0;
+      }
       pg->frame = 0;
       pg->id = 0;
       // unmap pages on PTE
       // use walkpgdir() to free memory
+      release(&(shm_table.lock));
+      return 0;
     }
   }
 
   release(&(shm_table.lock));
-  return 1; //added to remove compiler warning -- you should decide what to return
+  return 1; // reaches if match not found
 }
