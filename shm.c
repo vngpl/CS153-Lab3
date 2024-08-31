@@ -76,6 +76,7 @@ int shm_open(int id, char **pointer) {
 
 int shm_close(int id) {
   int i;
+  struct proc *curproc = myproc();
   struct shm_page *pg = 0;
 
   acquire(&(shm_table.lock));
@@ -88,10 +89,10 @@ int shm_close(int id) {
         release(&(shm_table.lock));
         return 0;
       }
+      kfree(pg->frame);
       pg->frame = 0;
       pg->id = 0;
-      // unmap pages on PTE
-      // use walkpgdir() to free memory
+      curproc->sz -= PGSIZE;
       release(&(shm_table.lock));
       return 0;
     }
